@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
   modal.innerHTML = `
     <div class="modal-content">
       <button class="close-modal"><i class="fas fa-times"></i></button>
-      <iframe class="player" allowfullscreen allow="autoplay; encrypted-media"></iframe>
+      <iframe class="player" allowfullscreen allow="autoplay; encrypted-media" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"></iframe>
     </div>
   `;
   document.body.appendChild(modal);
