@@ -1,0 +1,9 @@
+node_modules/
+.wrangler/
+*.log
+*.mp4
+*.png
+playwright_test*.js
+api_response*.json
+*_test*.html
+mui_player*.html

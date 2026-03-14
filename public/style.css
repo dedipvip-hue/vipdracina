@@ -354,7 +354,8 @@ a {
 
 .modal-content {
   width: 90%;
-  max-width: 1000px;
+  height: 90vh;
+  max-width: 500px; /* Usually portrait video for dramabox */
   background: #000;
   border-radius: 8px;
   overflow: hidden;
@@ -382,10 +383,10 @@ a {
   background: rgba(255, 60, 0, 0.8);
 }
 
-video.player {
+iframe.player {
   width: 100%;
-  height: auto;
-  max-height: 80vh;
+  height: 100%;
+  border: none;
   display: block;
 }
 

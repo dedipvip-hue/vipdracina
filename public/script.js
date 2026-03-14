@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
   modal.innerHTML = `
     <div class="modal-content">
       <button class="close-modal"><i class="fas fa-times"></i></button>
-      <video class="player" controls autoplay></video>
+      <iframe class="player" allowfullscreen allow="autoplay; encrypted-media"></iframe>
     </div>
   `;
   document.body.appendChild(modal);
@@ -18,7 +18,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   closeModalBtn.addEventListener('click', () => {
     modal.classList.remove('active');
-    videoPlayer.pause();
     videoPlayer.src = '';
   });
 
@@ -26,7 +25,6 @@ document.addEventListener('DOMContentLoaded', () => {
   modal.addEventListener('click', (e) => {
     if (e.target === modal) {
       modal.classList.remove('active');
-      videoPlayer.pause();
       videoPlayer.src = '';
     }
   });
@@ -42,7 +40,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function fetchDramas() {
-    console.log("Fetching dramas...");
     try {
       const response = await fetch('/api/random', {
         headers: {
@@ -50,19 +47,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
 
-      console.log("Fetch response status:", response.status);
 
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
 
       const text = await response.text();
-      console.log("Fetch text received, length:", text.length);
 
       let data;
       try {
           data = JSON.parse(text);
-          console.log("Successfully parsed JSON");
       } catch (e) {
           console.error("Failed to parse API response", text.substring(0, 100));
           throw new Error("Failed to parse API response");
@@ -70,15 +64,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Handle case where root is array directly
       if (Array.isArray(data)) {
-          console.log("Data is an array directly");
           data = { data: data };
       }
 
       if (data && data.data && data.data.length > 0) {
-        console.log(`Rendering ${data.data.length} dramas`);
         renderDramas(data.data);
       } else {
-        console.log("No drama data found in response");
         showError('Tidak ada drama ditemukan');
       }
     } catch (error) {
@@ -167,18 +158,15 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function extractVideoUrl(drama) {
-    // Try to get highest quality URL from cdnList
-    if (drama.cdnList && drama.cdnList.length > 0) {
-      const pathList = drama.cdnList[0].videoPathList;
-      if (pathList && pathList.length > 0) {
-        // Try to find 720p or 1080p, otherwise fallback to first
-        const hdVideo = pathList.find(v => v.quality >= 720);
-        return hdVideo ? hdVideo.videoPath : pathList[0].videoPath;
-      }
+    // The raw video files are DRM-encrypted (.encrypt.mp4) via Aliyun Media Transcoding
+    // and cannot be played directly via standard HTML5 <video> tags.
+    // However, the API provides a "shareVo.link" which serves as an embeddable web player.
+    if (drama.shareVo && drama.shareVo.link) {
+        return drama.shareVo.link;
     }
 
-    // Fallback to direct videoPath
-    return drama.videoPath;
+    // Fallback if no share link is provided
+    return `https://sharet.dramabox.com/play?bid=${drama.bookId}&lan=in`;
   }
 
   function playVideo(url) {
