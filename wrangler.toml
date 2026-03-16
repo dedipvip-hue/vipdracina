@@ -3,5 +3,5 @@ main = "worker.js"
 compatibility_date = "2024-01-01"
 
 [vars]
-API_KEY = "isi_api_key_asli_disini"
+API_KEY = "dedi131"
 
