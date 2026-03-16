@@ -7,33 +7,40 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
-    // Proxy the random API to avoid CORS issues
-    if (url.pathname === '/api/random') {
-      try {
-        const response = await fetch('https://magma-api.biz.id/dramabox/random', {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          }
-        });
-
-        // Use arrayBuffer to pass the response through exactly as it is, to avoid JSON parsing issues on large/chunked responses
-        const data = await response.arrayBuffer();
-
-        return new Response(data, {
-          headers: {
-            'Content-Type': 'application/json',
+    // API Route for ferdev API
+    if (url.pathname.startsWith('/api/')) {
+        const corsHeaders = {
             'Access-Control-Allow-Origin': '*',
-          },
-        });
-      } catch (error) {
-        return new Response(JSON.stringify({ error: 'Failed to fetch data' }), {
-          status: 500,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-          },
-        });
-      }
+            'Content-Type': 'application/json'
+        };
+
+        try {
+            let apiUrl = '';
+            if (url.pathname === '/api/drakor') {
+                const query = url.searchParams.get('query') || 'CEO';
+                apiUrl = `https://api.ferdev.my.id/internet/melolo/search?query=${query}&apikey=dedi131`;
+            } else if (url.pathname === '/api/detail') {
+                const bookId = url.searchParams.get('bookId');
+                apiUrl = `https://api.ferdev.my.id/internet/melolo/detail?bookId=${bookId}&apikey=dedi131`;
+            } else if (url.pathname === '/api/stream') {
+                const videoId = url.searchParams.get('videoId');
+                apiUrl = `https://api.ferdev.my.id/internet/melolo/stream?videoId=${videoId}&apikey=dedi131`;
+            } else {
+                return new Response(JSON.stringify({ error: 'Endpoint not found' }), { status: 404, headers: corsHeaders });
+            }
+
+            const response = await fetch(apiUrl, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                }
+            });
+
+            const data = await response.arrayBuffer();
+            return new Response(data, { headers: corsHeaders });
+
+        } catch (error) {
+            return new Response(JSON.stringify({ error: 'Failed to fetch data' }), { status: 500, headers: corsHeaders });
+        }
     }
 
     // Serve static assets from the public directory
