@@ -17,5 +17,8 @@
   "bugs": {
     "url": "https://github.com/dedipvip-hue/vipdracina/issues"
   },
-  "homepage": "https://github.com/dedipvip-hue/vipdracina#readme"
+  "homepage": "https://github.com/dedipvip-hue/vipdracina#readme",
+  "dependencies": {
+    "playwright": "^1.58.2"
+  }
 }
