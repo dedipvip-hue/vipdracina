@@ -4,13 +4,27 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
-    // Get API Key from environment variable or use default
-    const apiKey = env.API_KEY || DEFAULT_API_KEY;
+    // --- Key Management ---
+    let API_KEY_VAL = null;
+    if (env.dracin) {
+      try {
+        const obj = await env.dracin.get("API_KEY");
+        if (obj) {
+          API_KEY_VAL = (await obj.text()).trim();
+        }
+      } catch (e) {
+        console.error("Failed to read from R2", e);
+      }
+    }
+
+    if (!API_KEY_VAL) {
+      API_KEY_VAL = env.API_KEY || DEFAULT_API_KEY;
+    }
 
     // --- Proxy endpoints ---
     if (url.pathname === "/api/drakor") {
       const query = url.searchParams.get("query") || "CEO";
-      const apiUrl = `https://api.ferdev.my.id/internet/melolo/search?query=${encodeURIComponent(query)}&apikey=${apiKey}`;
+      const apiUrl = `https://api.ferdev.my.id/internet/melolo/search?query=${encodeURIComponent(query)}&apikey=${API_KEY_VAL}`;
       try {
         const response = await fetch(apiUrl, {
           headers: {
@@ -33,7 +47,7 @@ export default {
     if (url.pathname === "/api/detail") {
       const bookId = url.searchParams.get("bookId");
       if (!bookId) return new Response("Missing bookId", { status: 400 });
-      const apiUrl = `https://api.ferdev.my.id/internet/melolo/detail?bookId=${bookId}&apikey=${apiKey}`;
+      const apiUrl = `https://api.ferdev.my.id/internet/melolo/detail?bookId=${bookId}&apikey=${API_KEY_VAL}`;
       try {
         const response = await fetch(apiUrl, {
           headers: {
@@ -56,7 +70,7 @@ export default {
     if (url.pathname === "/api/stream") {
       const videoId = url.searchParams.get("videoId");
       if (!videoId) return new Response("Missing videoId", { status: 400 });
-      const apiUrl = `https://api.ferdev.my.id/internet/melolo/stream?videoId=${videoId}&apikey=${apiKey}`;
+      const apiUrl = `https://api.ferdev.my.id/internet/melolo/stream?videoId=${videoId}&apikey=${API_KEY_VAL}`;
       try {
         const response = await fetch(apiUrl, {
           headers: {
@@ -76,33 +90,31 @@ export default {
       }
     }
 
-    // --- HTML Frontend ---
+    // --- Serve Frontend HTML ---
     const html = `<!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VIPDRACINA - Nonton Drama Eksklusif</title>
+  <title>VIPDRACINA</title>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <style>
     :root {
       --primary: #e50914;
-      --bg-dark: #141414;
-      --bg-light: #181818;
+      --bg-color: #141414;
       --text-main: #ffffff;
       --text-muted: #aaaaaa;
+      --hover-bg: #2f2f2f;
+      --card-bg: #181818;
     }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
     body {
-      margin: 0;
-      padding: 0;
-      background-color: var(--bg-dark);
+      font-family: 'Netflix Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      background-color: var(--bg-color);
       color: var(--text-main);
-      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
       overflow-x: hidden;
-    }
-    a {
-      text-decoration: none;
-      color: inherit;
     }
 
     /* Navbar */
@@ -110,58 +122,48 @@ export default {
       position: fixed;
       top: 0;
       width: 100%;
-      height: 70px;
+      padding: 20px 4%;
       display: flex;
+      justify-content: space-between;
       align-items: center;
-      padding: 0 4%;
       background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);
       z-index: 1000;
-      box-sizing: border-box;
-      transition: background 0.3s ease;
+      transition: background 0.3s;
     }
-    .brand {
-      font-size: 24px;
+
+    .logo {
+      font-size: 28px;
       font-weight: bold;
+      letter-spacing: 2px;
       color: var(--primary);
-      margin-right: 40px;
-      letter-spacing: 1px;
     }
-    .brand span {
-      color: var(--text-main);
-    }
-    .nav-links {
-      display: flex;
-      gap: 20px;
-      flex-grow: 1;
-    }
-    .nav-links a {
-      font-size: 14px;
-      transition: color 0.3s;
-    }
-    .nav-links a:hover {
-      color: var(--text-muted);
-    }
+
+    .logo span { color: var(--text-main); }
+
     .nav-actions {
       display: flex;
-      align-items: center;
       gap: 20px;
+      align-items: center;
     }
-    .nav-actions i {
-      font-size: 18px;
+
+    .nav-icon {
+      color: var(--text-main);
+      font-size: 20px;
       cursor: pointer;
     }
 
     /* Hero Section */
     .hero {
       position: relative;
-      width: 100%;
       height: 80vh;
-      min-height: 500px;
-      background: var(--bg-light);
+      width: 100%;
+      background-size: cover;
+      background-position: center top;
       display: flex;
-      align-items: center;
-      overflow: hidden;
+      align-items: flex-end;
+      padding: 0 4% 10vh 4%;
     }
+
     .hero-video-container {
       position: absolute;
       top: 0;
@@ -170,384 +172,319 @@ export default {
       height: 100%;
       z-index: 0;
     }
+
     .hero-video-container img {
       width: 100%;
       height: 100%;
       object-fit: cover;
-      opacity: 0.5;
+      opacity: 0.7;
     }
-    .hero-video-container::after {
+
+    .hero::after {
       content: '';
       position: absolute;
-      top: 0;
+      bottom: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      background: linear-gradient(to right, rgba(20,20,20,1) 0%, rgba(20,20,20,0.4) 50%, rgba(20,20,20,0) 100%),
-                  linear-gradient(to top, rgba(20,20,20,1) 0%, rgba(20,20,20,0) 30%);
+      background: linear-gradient(to top, var(--bg-color) 0%, transparent 100%);
+      z-index: 1;
     }
+
     .hero-content {
       position: relative;
-      z-index: 1;
-      width: 50%;
-      padding-left: 4%;
+      z-index: 2;
+      max-width: 600px;
     }
+
     .hero-title {
-      font-size: 3.5rem;
-      margin: 0 0 10px 0;
-      line-height: 1.1;
+      font-size: 3rem;
+      font-weight: 800;
+      margin-bottom: 15px;
       text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
     }
+
     .hero-meta {
       display: flex;
       gap: 15px;
-      margin-bottom: 20px;
+      margin-bottom: 15px;
       font-size: 14px;
-      color: var(--text-muted);
+      color: #ccc;
+      font-weight: 600;
     }
+
     .hero-desc {
-      font-size: 1.2rem;
+      font-size: 1.1rem;
       line-height: 1.5;
-      margin-bottom: 30px;
+      margin-bottom: 25px;
+      color: #ddd;
       display: -webkit-box;
       -webkit-line-clamp: 3;
       -webkit-box-orient: vertical;
       overflow: hidden;
       text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
     }
+
     .hero-actions {
       display: flex;
       gap: 15px;
     }
-    .hero-actions button {
-      padding: 10px 24px;
+
+    .play-btn, .info-btn {
+      padding: 12px 28px;
+      border-radius: 4px;
       font-size: 1.1rem;
       font-weight: bold;
       border: none;
-      border-radius: 4px;
       cursor: pointer;
       display: flex;
       align-items: center;
       gap: 10px;
-      transition: opacity 0.2s;
-    }
-    .play-btn {
-      background-color: white;
-      color: black;
-    }
-    .play-btn:hover {
-      background-color: rgba(255,255,255,0.8);
-    }
-    .info-btn {
-      background-color: rgba(109, 109, 110, 0.7);
-      color: white;
-    }
-    .info-btn:hover {
-      background-color: rgba(109, 109, 110, 0.9);
+      transition: all 0.2s;
     }
 
-    /* Video Grid */
-    .section {
-      padding: 0 4% 50px 4%;
+    .play-btn {
+      background-color: var(--text-main);
+      color: #000;
+    }
+
+    .play-btn:hover { background-color: rgba(255,255,255,0.7); }
+
+    .info-btn {
+      background-color: rgba(109, 109, 110, 0.7);
+      color: var(--text-main);
+    }
+
+    .info-btn:hover { background-color: rgba(109, 109, 110, 0.4); }
+
+    /* Content Rows */
+    .content-section {
+      padding: 20px 4%;
       position: relative;
       z-index: 2;
       margin-top: -50px;
     }
-    .section-title {
-      font-size: 1.5rem;
-      margin-bottom: 20px;
+
+    .section-header {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-    }
-    .section-title span {
-      font-size: 14px;
-      color: var(--text-muted);
-      cursor: pointer;
-    }
-    .section-title span:hover {
-      color: white;
+      align-items: flex-end;
+      margin-bottom: 15px;
     }
 
-    .grid {
+    .section-title {
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .see-all {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 14px;
+      transition: color 0.2s;
+      cursor: pointer;
+    }
+
+    .see-all:hover { color: var(--text-main); }
+
+    .video-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
       gap: 15px;
     }
+
     .video-card {
       position: relative;
-      border-radius: 5px;
+      border-radius: 6px;
       overflow: hidden;
       cursor: pointer;
-      aspect-ratio: 9/13;
-      background: #222;
-      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      aspect-ratio: 2/3;
+      background: var(--card-bg);
+      transition: transform 0.3s ease;
     }
+
     .video-card:hover {
       transform: scale(1.05);
-      z-index: 3;
+      z-index: 10;
       box-shadow: 0 10px 20px rgba(0,0,0,0.8);
     }
+
     .video-thumbnail {
       width: 100%;
       height: 100%;
       object-fit: cover;
-      transition: opacity 0.3s;
     }
-    .video-card:hover .video-thumbnail {
-      opacity: 0.6;
-    }
+
     .play-icon-overlay {
       position: absolute;
       top: 50%;
       left: 50%;
-      transform: translate(-50%, -50%) scale(0.5);
-      font-size: 3rem;
-      color: white;
+      transform: translate(-50%, -50%);
+      font-size: 40px;
+      color: rgba(255,255,255,0.8);
       opacity: 0;
-      transition: all 0.3s ease;
+      transition: opacity 0.3s;
     }
-    .video-card:hover .play-icon-overlay {
-      opacity: 1;
-      transform: translate(-50%, -50%) scale(1);
-    }
+
+    .video-card:hover .play-icon-overlay { opacity: 1; }
+
     .video-info {
       position: absolute;
       bottom: 0;
       left: 0;
       width: 100%;
-      padding: 10px;
-      background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%);
-      box-sizing: border-box;
+      padding: 20px 10px 10px;
+      background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 100%);
+      color: white;
     }
+
     .video-title {
       font-size: 14px;
       font-weight: bold;
-      margin: 0 0 5px 0;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      margin-bottom: 5px;
     }
+
     .video-stats {
       font-size: 12px;
       color: var(--text-muted);
     }
 
-    /* Modal Styling */
-    .modal {
+    /* Modal / Detail View */
+    .modal-overlay {
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.8);
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.9);
       z-index: 2000;
-      display: flex;
+      display: none;
       justify-content: center;
       align-items: center;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.3s ease;
-      overflow-y: auto;
-      padding: 20px;
+      backdrop-filter: blur(5px);
     }
-    .modal.active {
-      opacity: 1;
-      pointer-events: auto;
-    }
+
+    .modal-overlay.active { display: flex; }
+
     .modal-content {
-      background: var(--bg-light);
+      background: var(--card-bg);
       width: 90%;
       max-width: 900px;
+      max-height: 90vh;
       border-radius: 10px;
+      overflow-y: auto;
       position: relative;
-      overflow: hidden;
-      box-shadow: 0 15px 30px rgba(0,0,0,0.5);
+      box-shadow: 0 0 30px rgba(0,0,0,0.8);
+      padding: 30px;
     }
+
     .modal-close {
       position: absolute;
-      top: 20px;
+      top: 15px;
       right: 20px;
-      font-size: 24px;
+      font-size: 28px;
       color: white;
+      cursor: pointer;
+      z-index: 10;
       background: rgba(0,0,0,0.5);
+      border-radius: 50%;
       width: 40px;
       height: 40px;
-      border-radius: 50%;
       display: flex;
       justify-content: center;
       align-items: center;
-      cursor: pointer;
-      z-index: 10;
-      transition: background 0.3s;
-    }
-    .modal-close:hover {
-      background: rgba(255,255,255,0.2);
+      border: 2px solid transparent;
     }
 
-    .modal-header {
-      display: flex;
-      padding: 40px;
-      gap: 30px;
-      background: linear-gradient(to bottom, #2a2a2a 0%, var(--bg-light) 100%);
+    .modal-close:hover { border-color: white; }
+
+    .player-container {
+      width: 100%;
+      aspect-ratio: 16/9;
+      background: #000;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 20px;
+      position: relative;
     }
+
+    video { width: 100%; height: 100%; object-fit: contain; }
+
+    .modal-header { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
 
     .modal-poster {
-      width: 200px;
-      border-radius: 8px;
-      box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+      width: 150px;
+      border-radius: 6px;
+      object-fit: cover;
+      aspect-ratio: 2/3;
     }
 
-    .modal-info {
-      flex-grow: 1;
-    }
-    .modal-title {
-      font-size: 2.5rem;
-      margin: 0 0 10px 0;
-    }
-    .modal-meta {
-      display: flex;
-      gap: 15px;
-      margin-bottom: 20px;
-      color: #aaa;
-      font-size: 14px;
-    }
-    .modal-desc {
-      line-height: 1.6;
-      color: #ddd;
-      margin-bottom: 20px;
-    }
+    .modal-info { flex: 1; }
 
-    .episode-list {
-      padding: 0 40px 40px 40px;
-    }
-    .episode-list h3 {
-      font-size: 1.2rem;
-      margin-bottom: 20px;
-      border-bottom: 1px solid #333;
-      padding-bottom: 10px;
-    }
+    .modal-title { font-size: 2rem; margin-bottom: 10px; }
+
+    .modal-meta { display: flex; gap: 15px; color: var(--text-muted); margin-bottom: 15px; font-size: 14px; }
+
+    .modal-desc { line-height: 1.6; color: #ddd; font-size: 15px; }
+
+    .episode-list { margin-top: 20px; }
 
     .episodes-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
       gap: 10px;
-      max-height: 300px;
-      overflow-y: auto;
-      padding-right: 10px;
+      margin-top: 15px;
     }
 
-    /* Player Container */
-    .player-container {
-      width: 100%;
-      background: #000;
-      position: relative;
-    }
-
-    .player-container video {
-      width: 100%;
-      max-height: 60vh;
-      outline: none;
+    .loading-state {
+      text-align: center;
+      padding: 50px;
+      color: var(--text-muted);
+      font-size: 1.2rem;
     }
 
     .hidden { display: none !important; }
 
-    /* Custom Scrollbar */
-    ::-webkit-scrollbar {
-      width: 8px;
-    }
-    ::-webkit-scrollbar-track {
-      background: #141414;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #333;
-      border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: #555;
-    }
-
-    .loading-state {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 200px;
-      font-size: 1.2rem;
-      color: var(--text-muted);
-    }
-
-    /* Responsive */
     @media (max-width: 768px) {
-      .hero-content {
-        width: 90%;
-      }
-      .hero-title {
-        font-size: 2rem;
-      }
-      .modal-header {
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-        padding: 20px;
-      }
-      .modal-poster {
-        width: 150px;
-      }
-      .episode-list {
-        padding: 0 20px 20px 20px;
-      }
-      .nav-links {
-        display: none;
-      }
+      .hero-title { font-size: 2rem; }
+      .video-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+      .modal-header { flex-direction: column; }
+      .modal-poster { width: 100px; }
     }
   </style>
 </head>
 <body>
-
-  <!-- Navbar -->
   <nav class="navbar">
-    <div class="brand">VIP<span>DRACINA</span></div>
-    <div class="nav-links">
-      <a href="#">Beranda</a>
-      <a href="#">Eksklusif</a>
-      <a href="#">Terbaru</a>
-      <a href="#">Kategori</a>
-    </div>
+    <div class="logo">VIP<span>DRACINA</span></div>
     <div class="nav-actions">
-      <i class="fas fa-search"></i>
+      <i class="fas fa-search nav-icon" id="searchBtn"></i>
+      <i class="fas fa-bell nav-icon"></i>
+      <img src="https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png" alt="Profile" style="width: 32px; border-radius: 4px; cursor: pointer;">
     </div>
   </nav>
 
-  <!-- Hero Section -->
-  <header class="hero" id="hero-section">
-    <div class="loading-state">
-      <i class="fas fa-spinner fa-spin" style="font-size: 2rem; margin-right: 10px;"></i>
-      Memuat VIPDRACINA...
-    </div>
-  </header>
+  <section class="hero" id="heroSection">
+    <div class="loading-state">Memuat data terbaru...</div>
+  </section>
 
-  <!-- Video Grid -->
-  <section class="section">
-    <div class="section-title">
-      <h2>Rekomendasi Untukmu</h2>
-      <span>Lihat Semua <i class="fas fa-chevron-right"></i></span>
+  <section class="content-section">
+    <div class="section-header">
+      <h2 class="section-title">Rekomendasi Untukmu</h2>
+      <a href="#" class="see-all">Lihat Semua <i class="fas fa-chevron-right"></i></a>
     </div>
-    <div class="grid" id="video-grid">
-      <!-- Cards injected by JS -->
-    </div>
+    <div class="video-grid" id="videoGrid"></div>
   </section>
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      const heroSection = document.getElementById('hero-section');
-      const videoGrid = document.getElementById('video-grid');
+      const heroSection = document.getElementById('heroSection');
+      const videoGrid = document.getElementById('videoGrid');
 
       const modal = document.createElement('div');
-      modal.className = 'modal';
+      modal.className = 'modal-overlay';
       modal.innerHTML = \`
         <div class="modal-content">
-          <div class="modal-close"><i class="fas fa-times"></i></div>
-
+          <span class="modal-close">&times;</span>
           <div id="player-container" class="player-container hidden">
             <video id="videoPlayer" controls autoplay ></video>
             <div id="playerLoading" class="loading-state hidden">Memuat video...</div>
