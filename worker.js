@@ -29,7 +29,7 @@ export default {
         if (!newKey) return new Response(JSON.stringify({ success: false, message: "Key tidak boleh kosong" }), { status: 400 });
 
         // Test the key against the API
-        const testUrl = `https://api.ferdev.my.id/internet/melolo/search?query=CEO&apikey=${newKey}`;
+        const testUrl = `https://api.ferdev.my.id/internet/melolo/search?query=CEO&apikey=${encodeURIComponent(newKey)}`;
         const testRes = await fetch(testUrl, { headers: { "User-Agent": "Mozilla/5.0" } });
         const testData = await testRes.json();
 
@@ -51,7 +51,7 @@ export default {
 
     if (url.pathname === "/api/drakor") {
       const query = url.searchParams.get("query") || "CEO";
-      const apiUrl = `https://api.ferdev.my.id/internet/melolo/search?query=${encodeURIComponent(query)}&apikey=${API_KEY_VAL}`;
+      const apiUrl = `https://api.ferdev.my.id/internet/melolo/search?query=${encodeURIComponent(query)}&apikey=${encodeURIComponent(API_KEY_VAL)}`;
       try {
         const response = await fetch(apiUrl, {
           headers: {
@@ -74,7 +74,7 @@ export default {
     if (url.pathname === "/api/detail") {
       const bookId = url.searchParams.get("bookId");
       if (!bookId) return new Response("Missing bookId", { status: 400 });
-      const apiUrl = `https://api.ferdev.my.id/internet/melolo/detail?bookId=${bookId}&apikey=${API_KEY_VAL}`;
+      const apiUrl = `https://api.ferdev.my.id/internet/melolo/detail?bookId=${bookId}&apikey=${encodeURIComponent(API_KEY_VAL)}`;
       try {
         const response = await fetch(apiUrl, {
           headers: {
@@ -97,7 +97,7 @@ export default {
     if (url.pathname === "/api/stream") {
       const videoId = url.searchParams.get("videoId");
       if (!videoId) return new Response("Missing videoId", { status: 400 });
-      const apiUrl = `https://api.ferdev.my.id/internet/melolo/stream?videoId=${videoId}&apikey=${API_KEY_VAL}`;
+      const apiUrl = `https://api.ferdev.my.id/internet/melolo/stream?videoId=${videoId}&apikey=${encodeURIComponent(API_KEY_VAL)}`;
       try {
         const response = await fetch(apiUrl, {
           headers: {
