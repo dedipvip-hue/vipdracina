@@ -22,6 +22,33 @@ export default {
     }
 
     // --- Proxy endpoints ---
+    if (url.pathname === "/api/key" && request.method === "POST") {
+      try {
+        const body = await request.json();
+        const newKey = body.key;
+        if (!newKey) return new Response(JSON.stringify({ success: false, message: "Key tidak boleh kosong" }), { status: 400 });
+
+        // Test the key against the API
+        const testUrl = `https://api.ferdev.my.id/internet/melolo/search?query=CEO&apikey=${newKey}`;
+        const testRes = await fetch(testUrl, { headers: { "User-Agent": "Mozilla/5.0" } });
+        const testData = await testRes.json();
+
+        if (testData.success === false && testData.status === 403) {
+            return new Response(JSON.stringify({ success: false, message: "API Key Tidak Valid!" }), { status: 403 });
+        }
+
+        // Save to R2
+        if (env.dracin) {
+          await env.dracin.put("API_KEY", newKey);
+          return new Response(JSON.stringify({ success: true, message: "API Key berhasil disimpan dan terhubung!" }));
+        } else {
+          return new Response(JSON.stringify({ success: false, message: "R2 Bucket 'dracin' tidak ditemukan di environment." }), { status: 500 });
+        }
+      } catch (err) {
+        return new Response(JSON.stringify({ success: false, message: "Gagal memproses permintaan: " + err.message }), { status: 500 });
+      }
+    }
+
     if (url.pathname === "/api/drakor") {
       const query = url.searchParams.get("query") || "CEO";
       const apiUrl = `https://api.ferdev.my.id/internet/melolo/search?query=${encodeURIComponent(query)}&apikey=${API_KEY_VAL}`;
@@ -443,6 +470,63 @@ export default {
       font-size: 1.2rem;
     }
 
+
+    /* Settings Modal */
+    .settings-modal {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8);
+      z-index: 3000;
+      display: none;
+      justify-content: center;
+      align-items: center;
+    }
+    .settings-modal.active { display: flex; }
+    .settings-content {
+      background: var(--card-bg);
+      padding: 30px;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 400px;
+      text-align: center;
+      position: relative;
+    }
+    .settings-content h2 { margin-bottom: 20px; }
+    .settings-input {
+      width: 100%;
+      padding: 12px;
+      border-radius: 4px;
+      border: 1px solid #333;
+      background: #111;
+      color: white;
+      margin-bottom: 20px;
+      font-size: 16px;
+    }
+    .settings-btn {
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      width: 100%;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+    }
+    .settings-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .settings-close {
+      position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer; color: #888;
+    }
+    .notification {
+      margin-top: 15px;
+      font-size: 14px;
+      padding: 10px;
+      border-radius: 4px;
+      display: none;
+    }
+    .notification.success { background: rgba(0, 255, 0, 0.1); color: #0f0; border: 1px solid #0f0; display: block; }
+    .notification.error { background: rgba(255, 0, 0, 0.1); color: #f00; border: 1px solid #f00; display: block; }
+
     .hidden { display: none !important; }
 
     @media (max-width: 768px) {
@@ -458,10 +542,23 @@ export default {
     <div class="logo">VIP<span>DRACINA</span></div>
     <div class="nav-actions">
       <i class="fas fa-search nav-icon" id="searchBtn"></i>
-      <i class="fas fa-bell nav-icon"></i>
+      <i class="fas fa-cog nav-icon" id="settingsBtn" title="Pengaturan API"></i>
       <img src="https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png" alt="Profile" style="width: 32px; border-radius: 4px; cursor: pointer;">
     </div>
   </nav>
+
+
+  <!-- Settings Modal -->
+  <div class="settings-modal" id="settingsModal">
+    <div class="settings-content">
+      <span class="settings-close" id="settingsClose">&times;</span>
+      <h2>Pengaturan API Key</h2>
+      <p style="font-size: 14px; color: #aaa; margin-bottom: 15px;">Masukkan API Key dari ferdev.my.id</p>
+      <input type="text" id="apiKeyInput" class="settings-input" placeholder="Ferdiz-AFK">
+      <button id="saveApiKeyBtn" class="settings-btn">Simpan & Hubungkan</button>
+      <div id="apiNotification" class="notification"></div>
+    </div>
+  </div>
 
   <section class="hero" id="heroSection">
     <div class="loading-state">Memuat data terbaru...</div>
@@ -477,6 +574,65 @@ export default {
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
+
+      // Settings logic
+      const settingsBtn = document.getElementById('settingsBtn');
+      const settingsModal = document.getElementById('settingsModal');
+      const settingsClose = document.getElementById('settingsClose');
+      const saveApiKeyBtn = document.getElementById('saveApiKeyBtn');
+      const apiKeyInput = document.getElementById('apiKeyInput');
+      const apiNotification = document.getElementById('apiNotification');
+
+      settingsBtn.addEventListener('click', () => {
+        settingsModal.classList.add('active');
+      });
+
+      settingsClose.addEventListener('click', () => {
+        settingsModal.classList.remove('active');
+        apiNotification.className = 'notification';
+      });
+
+      saveApiKeyBtn.addEventListener('click', async () => {
+        const key = apiKeyInput.value.trim();
+        if (!key) {
+           apiNotification.textContent = "API Key tidak boleh kosong!";
+           apiNotification.className = "notification error";
+           return;
+        }
+
+        saveApiKeyBtn.disabled = true;
+        saveApiKeyBtn.textContent = "Menghubungkan...";
+        apiNotification.className = "notification";
+
+        try {
+          const res = await fetch('/api/key', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key })
+          });
+          const data = await res.json();
+
+          if (res.ok && data.success) {
+            apiNotification.textContent = data.message;
+            apiNotification.className = "notification success";
+            setTimeout(() => {
+               settingsModal.classList.remove('active');
+               apiNotification.className = "notification";
+               fetchDramas(); // reload data
+            }, 2000);
+          } else {
+            apiNotification.textContent = data.message || "Gagal menghubungkan.";
+            apiNotification.className = "notification error";
+          }
+        } catch(e) {
+            apiNotification.textContent = "Terjadi kesalahan jaringan.";
+            apiNotification.className = "notification error";
+        } finally {
+            saveApiKeyBtn.disabled = false;
+            saveApiKeyBtn.textContent = "Simpan & Hubungkan";
+        }
+      });
+
       const heroSection = document.getElementById('heroSection');
       const videoGrid = document.getElementById('videoGrid');
 
